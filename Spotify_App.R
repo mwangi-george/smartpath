@@ -20,7 +20,7 @@ div {padding: 0 !important;}'
     box(width = 6, plotlyOutput("avg_happiness", height = 300) %>% withSpinner()),
     box(width = 6, plotlyOutput("dist", height = 300) %>% withSpinner()),
     box(width = 6, plotlyOutput("key_signatures", height = 300) %>% withSpinner()),
-    box(width = 12, plotlyOutput("bpm_vs_dance", height = 300) %>% withSpinner())
+    box(width = 12, plotlyOutput("bpm_vs_dance", height = 500) %>% withSpinner())
   )
 )
 
@@ -40,7 +40,8 @@ server <- function(input, output, session){
         title = "Top 10 Artists with most songs",
         xaxis = list(title = "Artist Name"),
         yaxis = list(title = "Number of Songs")
-      )
+      )%>%
+      config(displayModeBar = FALSE)
   })
   
   output$contributions <- renderPlotly({
@@ -53,7 +54,8 @@ server <- function(input, output, session){
         title = "How Many Artists are Contributing to Songs",
         xaxis = list(title = "Number of Artists"),
         yaxis = list(title = "Number of Songs")
-      )
+      )%>%
+      config(displayModeBar = FALSE)
   })
   
   output$pop_over_time <- renderPlotly({
@@ -70,7 +72,8 @@ server <- function(input, output, session){
         title = "Popularity of songs on Spotify over the years",
         xaxis = list(title = "Year"),
         yaxis = list(title = "Number of Playlists")
-      )
+      )%>%
+      config(displayModeBar = FALSE)
   })
   
   output$avg_happiness <- renderPlotly({
@@ -92,7 +95,8 @@ server <- function(input, output, session){
         title = "Average valence (happiness) score for songs over time",
         xaxis = list(title = "Year", zeroline = T),
         yaxis = list(title = "Happiness Score")
-      )
+      )%>%
+      config(displayModeBar = FALSE)
   })
   output$dist <- renderPlotly({
     spotify %>% 
@@ -103,27 +107,40 @@ server <- function(input, output, session){
         title = "Distribution of song streams across the dataset",
         xaxis = list(title = "Streams"),
         yaxis = list(title = "Frequency")
-      )
+      )%>%
+      config(displayModeBar = FALSE)
   })
   
   output$bpm_vs_dance <- renderPlotly({
-    #loess model
-    m <- loess(danceability_percent ~ bpm, data = spotify, span = 1.5)
     spotify %>% 
-      plot_ly(
-        x = ~bpm, y = ~danceability_percent, symbol = ~key,
-        hoverinfo = "text",
-        text =  ~paste(
-          "BPM:", bpm, "<br>", "% Danceability:", danceability_percent, "<br>", "Key:", key
+      group_by(key) %>% 
+      nest() %>% 
+      mutate(
+        plot = map2(
+          data, key,
+          \(data, key)
+          plot_ly( 
+            data = data,
+            x = ~ bpm, 
+            y = ~ danceability_percent,
+            color = ~mode,
+            hoverinfo = "text",
+            text =  ~paste(
+              "BPM:", bpm, "<br>", "Danceability:", paste0(danceability_percent, "%"), "<br>", 
+              "Key:", key,  "<br>", "Mode:", mode
+            )
+          ) %>% 
+            add_markers(name = ~key, colors = c("#1DB954", "#191414")) %>% 
+            layout(
+              showlegend = F,
+              title = "Relationship between song tempo (BPM) and Danceability (Faceted by Key Signatures & Colored by Mode)",
+              xaxis = list(title = "BPM (Tempo)"),
+              yaxis = list(title = "% Danceability")
+            ) %>% 
+            config(displayModeBar = F)
         )
       ) %>% 
-      add_markers() %>% 
-      add_lines(y = ~ fitted(m), showlegend = F) %>% 
-      layout(
-        title = "Relationship between song tempo (BPM) and Danceability",
-        xaxis = list(title = "BPM (Tempo)"),
-        yaxis = list(title = "% Danceability")
-      )
+      subplot(nrows = 3, shareX = T, shareY = T)
   })
   
   output$key_signatures <- renderPlotly({
@@ -142,7 +159,8 @@ server <- function(input, output, session){
       add_bars(orientation = 'h', color = I("#1DB954")) %>% 
       layout(
         title = "Most common key signatures in popular songs",
-        xaxis = list(zeroline = F, title = "Popularity"), yaxis = list(title = "Key"))
+        xaxis = list(zeroline = F, title = "Popularity"), yaxis = list(title = "Key"))%>%
+      config(displayModeBar = FALSE)
   })
 }
 
