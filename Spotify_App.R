@@ -20,6 +20,8 @@ div {padding: 0 !important;}'
     box(width = 6, plotlyOutput("avg_happiness", height = 300) %>% withSpinner()),
     box(width = 6, plotlyOutput("dist", height = 300) %>% withSpinner()),
     box(width = 6, plotlyOutput("key_signatures", height = 300) %>% withSpinner()),
+    box(width = 6, plotlyOutput("splom", height = 500) %>% withSpinner()),
+    box(width = 6, plotlyOutput("dot", height = 500) %>% withSpinner()),
     box(width = 12, plotlyOutput("bpm_vs_dance", height = 500) %>% withSpinner())
   )
 )
@@ -153,14 +155,48 @@ server <- function(input, output, session){
         x = ~n, y = ~ key,
         hoverinfo = "text",
         text =  ~paste(
-          "Key Signature:", key, "<br>", "% Popularity:", paste0(n, "%")
+          "Key Signature:", key, "<br>", "Popularity:", paste0(n, "%")
         )
       ) %>% 
       add_bars(orientation = 'h', color = I("#1DB954")) %>% 
       layout(
         title = "Most common key signatures in popular songs",
-        xaxis = list(zeroline = F, title = "Popularity"), yaxis = list(title = "Key"))%>%
+        xaxis = list(zeroline = F, title = "% Popularity"), yaxis = list(title = "Key"))%>%
       config(displayModeBar = FALSE)
+  })
+  
+  output$splom <- renderPlotly({
+    spotify %>% 
+      plot_ly(
+        color = ~mode, colors = c("#1DB954", "#191414")
+      ) %>% 
+      add_trace(
+        type = "splom",
+        dimensions = list(
+          list(label = "Streams", values = ~ streams),
+          list(label = "in_spotify_charts", values = ~ in_spotify_charts),
+          list(label = "Danceability Percent", values = ~ danceability_percent)
+        )
+      ) %>% 
+      layout(
+        title = "Scatter Plot Matrices"
+      ) %>% 
+      config(displayModeBar = F)
+  })
+  
+  output$dot <- renderPlotly({
+    spotify %>% 
+      filter(!is.na(key)) %>% 
+      slice_max(in_spotify_playlists, n = 55) %>% distinct(key, .keep_all = T) %>% 
+      mutate(key = fct_reorder(key, in_spotify_playlists, .desc = F)) %>% 
+      plot_ly(x = ~ in_spotify_playlists, y = ~ key) %>% 
+      add_markers(color = I("#1DB954"))  %>%
+      layout(xaxis = list(title = "In Spotify Playlists"),
+             yaxis = list(title = "Key", type = "category"),
+             title = "Most Famous Key Signatures in Spotify Playlists",
+             showlegend = F
+      ) %>% 
+      config(displayModeBar = F)
   })
 }
 
